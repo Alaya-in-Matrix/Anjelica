@@ -6,35 +6,27 @@ import System.Environment
 
 -- both preList and currentList are supposed to be infinite list
 -- so I won't consider the situation of empty list
-data MoveList a = MoveList {
-    preList :: [a],
-    currentList :: [a]
+data MoveList = MoveList {
+    preList :: [Char],
+    currentList :: [Char]
 } deriving(Eq)
 
-instance (Enum a) => Show (MoveList a) where 
-    show (MoveList _ (c:cs)) = let showChar = toEnum $ fromEnum c
-                                in "MoveList [...] [" ++ [showChar] ++ ", ...]"
-instance Functor MoveList  where
-    fmap f (MoveList prev curr) = MoveList (f <$> prev) (f <$> curr)
+instance Show MoveList where 
+    show (MoveList _ (c:cs)) = "MoveList [...] [" ++ [c] ++ ", ...]"
 
-env :: MoveList Char
-env = fmap toEnum $ MoveList [0..] [0..]
+env :: MoveList 
+env = MoveList init init where init = map toEnum [0..]
 
-headApply :: (a->a) -> MoveList a -> MoveList a
-headApply f (MoveList _ []) = error "empty!"
-headApply f (MoveList prev (c:cs)) = MoveList prev ((f c) : cs)
-next :: MoveList a -> MoveList a
-next (MoveList pre (c:cs)) = MoveList (c:pre) cs
-prev :: MoveList a -> MoveList a
-prev (MoveList (p:ps) curr) = MoveList ps (p:curr)
-addOne :: (Enum a) => MoveList a -> MoveList a
+next      (MoveList pre    (c:cs)) = MoveList (c:pre) cs
+prev      (MoveList (p:ps) curr)   = MoveList ps (p:curr)
+headEle   (MoveList prev   curr)   = head curr
+
+newHead   x (MoveList prev   (c:cs)) = MoveList prev (x:cs)
+headApply f (MoveList pre (c:cs))    = MoveList pre ((f c) : cs)
+
 addOne = headApply succ
-subOne :: (Enum a) => MoveList a -> MoveList a
 subOne = headApply pred
-headEle :: (MoveList a) -> a
-headEle (MoveList prev curr) = head curr
-newHead :: a -> (MoveList a) -> MoveList a
-newHead x (MoveList prev (c:cs)) = MoveList prev (x:cs)
+
 data BrainFuck = RightMove 
                | LeftMove
                | Add
@@ -53,45 +45,40 @@ parseBrainFuck = many parseBrainFuckOp
                        <|> Output    <$ char '.'
                        <|> Input     <$ char ','
                        <|> Loop <$> between (char '[') (char ']') parseBrainFuck
-                       <?> "BRAINFUCK EXPRESSION"
--- parseBrainFuck = many $ RightMove <$ char '>'
---                     <|> LeftMove  <$ char '<'
---                     <|> Add       <$ char '+'
---                     <|> Sub       <$ char '-'
---                     <|> Output    <$ char '.'
---                     <|> Input     <$ char ','
---                     <|> Loop <$> between (char '[') (char ']') parseBrainFuck
---                     <?> "BRAINFUCK EXPRESSION"
+                       <?> "Anjelica-Ebbi"
 
 
-evalOne :: (Enum a) => (MoveList a) -> BrainFuck -> IO (MoveList a)
-evalOne env RightMove = return $ next env
-evalOne env LeftMove  = return $ prev env
-evalOne env Add       = return $ addOne env
-evalOne env Sub       = return $ subOne env
-evalOne env Output    = do
-    putChar $ toEnum $ fromEnum $ headEle env
-    return env
-evalOne env Input     = do
-    newChar <- getChar
-    return $ newHead (toEnum $ fromEnum newChar) env
-evalOne env (Loop exprs) = do
-    let ptrVal = fromEnum $ headEle env
-    if ptrVal == 0
-       then return env
-       else do
-           newEnv <- eval env exprs
-           evalOne newEnv (Loop exprs)
-eval :: (Enum a) => (MoveList a) -> [BrainFuck] -> IO (MoveList a)
+evalOne :: MoveList  -> BrainFuck -> IO MoveList
+evalOne env RightMove    = return $ next   env
+evalOne env LeftMove     = return $ prev   env
+evalOne env Add          = return $ addOne env
+evalOne env Sub          = return $ subOne env
+evalOne env Output       = putChar (headEle env) >> return env
+evalOne env Input        = getChar >>= return . (flip newHead) env
+evalOne env (Loop exprs) = case fromEnum (headEle env) of
+                             0 -> return env
+                             _ -> do newEnv <- eval env exprs
+                                     evalOne newEnv (Loop exprs)
+eval :: MoveList  -> [BrainFuck] -> IO MoveList 
 eval  = foldM evalOne 
+
 main :: IO ()
 main = do 
     filePath <- head <$> getArgs
+    putStrLn "Source"
+    readFile filePath >>= putStrLn
+    putStrLn "============================="
     parsedContent <- parseFromFile parseBrainFuck filePath
     case parsedContent of
-      Left err    -> print err
+      Left  err   -> print err
       Right exprs -> do
+          putStrLn "Result"
           eval env exprs
           return ()
 
-
+test = do
+    a <- getChar
+    print "Fuck"
+    b <- getChar
+    print "Fuck"
+    print [a,b]
