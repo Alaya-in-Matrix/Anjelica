@@ -47,17 +47,16 @@ parseBrainFuck = many parseBrainFuckOp
                        <|> Loop <$> between (char '[') (char ']') parseBrainFuck
                        <?> "Anjelica-Ebbi"
 
-evalOne :: MoveList  -> BrainFuck -> IO MoveList
-evalOne env RightMove    = return $ next   env
-evalOne env LeftMove     = return $ prev   env
-evalOne env Add          = return $ addOne env
-evalOne env Sub          = return $ subOne env
-evalOne env Output       = putChar (headEle env) >> return env
-evalOne env Input        = getChar >>= return . (flip newHead) env
-evalOne env (Loop exprs) = case fromEnum (headEle env) of
-                             0 -> return env
-                             _ -> do newEnv <- (foldM evalOne) env exprs
-                                     evalOne newEnv (Loop exprs)
+eval :: MoveList  -> BrainFuck -> IO MoveList
+eval env RightMove    = return $ next   env
+eval env LeftMove     = return $ prev   env
+eval env Add          = return $ addOne env
+eval env Sub          = return $ subOne env
+eval env Output       = putChar (headEle env) >> return env
+eval env Input        = getChar >>= return . (flip newHead) env
+eval env (Loop exprs) = case fromEnum (headEle env) of
+                          0 -> return env
+                          _ -> foldM eval env exprs >>= flip eval (Loop exprs)
 
 main :: IO ()
 main = do 
@@ -71,4 +70,4 @@ main = do
       Left  err   -> print err
       Right exprs -> do
           putStrLn "Result"
-          foldM_ evalOne env exprs
+          foldM_ eval env exprs
