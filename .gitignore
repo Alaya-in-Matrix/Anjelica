@@ -1,4 +1,6 @@
 *.swp
+run.sh
+
 dist
 cabal-dev
 *.o
