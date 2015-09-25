@@ -47,7 +47,6 @@ parseBrainFuck = many parseBrainFuckOp
                        <|> Loop <$> between (char '[') (char ']') parseBrainFuck
                        <?> "Anjelica-Ebbi"
 
-
 evalOne :: MoveList  -> BrainFuck -> IO MoveList
 evalOne env RightMove    = return $ next   env
 evalOne env LeftMove     = return $ prev   env
@@ -57,28 +56,19 @@ evalOne env Output       = putChar (headEle env) >> return env
 evalOne env Input        = getChar >>= return . (flip newHead) env
 evalOne env (Loop exprs) = case fromEnum (headEle env) of
                              0 -> return env
-                             _ -> do newEnv <- eval env exprs
+                             _ -> do newEnv <- (foldM evalOne) env exprs
                                      evalOne newEnv (Loop exprs)
-eval :: MoveList  -> [BrainFuck] -> IO MoveList 
-eval  = foldM evalOne 
 
 main :: IO ()
 main = do 
     filePath <- head <$> getArgs
     putStrLn "Source"
-    readFile filePath >>= putStrLn
+    content  <- filter (`elem` "><+-.,[]") <$> readFile filePath
+    putStrLn content
     putStrLn "============================="
-    parsedContent <- parseFromFile parseBrainFuck filePath
+    let parsedContent = parse parseBrainFuck "BrainFuck" content
     case parsedContent of
       Left  err   -> print err
       Right exprs -> do
           putStrLn "Result"
-          eval env exprs
-          return ()
-
-test = do
-    a <- getChar
-    print "Fuck"
-    b <- getChar
-    print "Fuck"
-    print [a,b]
+          foldM_ evalOne env exprs
