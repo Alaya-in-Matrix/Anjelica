@@ -16,7 +16,7 @@ instance Show MoveList where
     show (MoveList _ (c:cs)) = "MoveList [...] [" ++ [c] ++ ", ...]"
 
 env :: MoveList 
-env = MoveList init init where init = map toEnum [0..]
+env = MoveList init init where init = map toEnum (repeat 0)
 
 next      (MoveList pre    (c:cs)) = MoveList (c:pre) cs
 prev      (MoveList (p:ps) curr)   = MoveList ps (p:curr)
