@@ -3,6 +3,7 @@ import Text.ParserCombinators.Parsec
 import Control.Applicative hiding((<|>), many)
 import Control.Monad
 import System.Environment
+import Language.Whitespace
 
 -- both preList and currentList are supposed to be infinite list
 -- so I won't consider the situation of empty list
