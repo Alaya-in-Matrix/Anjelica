@@ -4,6 +4,7 @@ import Text.ParserCombinators.Parsec
 import Control.Monad
 import Control.Applicative hiding((<|>), many)
 import System.Environment
+import qualified Data.Map as M
 
 data IMP = Stack      StackOp
          | Arithmetic ArithOp
@@ -64,6 +65,23 @@ ctrlCmdParser = wsSpace *> (wsSpace *> (Label <$> numParser) <|>
                             wsTab   *> (JumpNeg  <$> numParser) <|>
                             FuncEnd <$ wsLf)
             <|> FuncEnd <$ (wsLf *> wsLf)
+
+data VM = VM {
+    stack :: [Int] , 
+    instructions :: [IMP] , 
+    pc :: Int , 
+    jumptable :: M.Map Int Int
+} deriving(Eq, Show)
+
+eval :: VM -> IO VM
+eval vm = let index   = pc vm
+              codeMem = instructions vm
+              instr   = codeMem !! index
+           in evalInstr vm instr
+
+evalInstr :: VM -> IMP -> IO VM
+evalInstr = undefined
+
 -- num   = "\t \t\t\n" -- (-3)
 -- testInstructions = [
 --     " "    ++ num 
