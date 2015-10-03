@@ -1,7 +1,7 @@
 # README
 
 * Author: lvwenlong_lambda@qq.com
-* Last Modified:2015年09月29日 星期二 23时36分52秒 二
+* Last Modified:2015年10月03日 星期六 19时03分47秒 六
 
 ## About this project
 
@@ -24,3 +24,4 @@ Parsers for some interesting programming language, writtin in Haskell, using `Pa
 ## About Whitespace
 
 [Whitespace Wiki](https://en.wikipedia.org/wiki/Whitespace_(programming_language))
+[Whitespace Tutorial](http://compsoc.dur.ac.uk/whitespace/tutorial.html)
