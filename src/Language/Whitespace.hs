@@ -93,12 +93,15 @@ eval :: VM -> IO VM
 eval vm = let index   = pc vm
               codeMem = instructions vm
               instr   = codeMem !! index
-           in evalInstr vm instr
+           in case instr of
+                Control ProgEnd -> return vm
+                _               -> evalInstr vm instr >>= eval
+
 
 evalInstr :: VM -> IMP -> IO VM
 evalInstr (VM s h i p j) (Stack (Push num)) = return $ VM (num:s)  h i (p+1) j
 evalInstr (VM s h i p j) (Stack Duplicate)  = undefined
-evalInstr (VM s h i p j) (Stack pop)        = return $ VM (tail s) h i (p+1) j
+evalInstr (VM s h i p j) (Stack Pop)        = return $ VM (tail s) h i (p+1) j
 evalInstr (VM s h i p j) (Stack Swap)       = return $ VM (swap s) h i (p+1) j 
   where swap (a:b:rest) = (b:a:rest)
 evalInstr (VM (x:y:rest) h i p j) (Arithmetic arOp) = return $ VM ((x `op` y):rest) h i (p+1) j 
@@ -131,6 +134,7 @@ evalInstr (VM s h i p j) (Control (JumpNeg n)) = return $ VM s h i newPC j
 evalInstr (VM s h i p j) (Control (JumpZero n)) = return $ VM s h i newPC j
   where newPC = if ((head s) == 0) then fromJust $ M.lookup n j
                                    else p+1
+
 
 -- num   = "\t \t\t\n" -- (-3)
 -- testInstructions = [
