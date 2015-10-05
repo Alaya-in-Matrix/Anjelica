@@ -1,10 +1,15 @@
 module Language.Whitespace where
 
+-- Author: lvwenlong_lambda@qq.com
+-- Last Modified:2015年10月05日 星期一 22时16分38秒 一
+
 import Text.ParserCombinators.Parsec
 import Control.Monad
 import Control.Applicative hiding((<|>), many)
 import System.Environment
 import Data.Maybe
+import Numeric (showIntAtBase)
+import Data.Char(intToDigit)
 import qualified Data.Map.Strict as M
 
 data IMP     = Stack      StackOp
@@ -33,6 +38,56 @@ data CtrlCmd = Label Integer
              | JumpNeg Integer 
              | FuncEnd 
              | ProgEnd deriving(Eq, Show)
+
+-- Perhaps I should test it through QuichCheck
+-- Property: disAssembly (parseFunc str) == str
+class DisAssembly a where 
+    disAssembly :: a -> String
+instance DisAssembly Integer where
+    disAssembly n = let absn    = abs n
+                        sEncode = if signum n == 1 then ' ' else '\t' -- space for positive and tab for negative
+                        nEncode = map (\c->if c == '0' then ' ' else '\t') $ showIntAtBase 2 intToDigit absn ""
+                     in sEncode : nEncode ++ "\n"
+instance DisAssembly StackOp where
+    disAssembly stackOp = case stackOp of 
+                            (Push n)  -> ' ' : disAssembly n
+                            Duplicate -> "\n "
+                            Swap      -> "\n\t"
+                            Pop       -> "\n\n"
+instance DisAssembly ArithOp where
+    disAssembly arithOp = case arithOp of
+                            Add -> "  "
+                            Sub -> " \t"
+                            Mul -> " \n"
+                            Div -> "\t "
+                            Mod -> "\t\t"
+instance DisAssembly HeapOp where
+    disAssembly heapOp = case heapOp of
+                           Store    -> " "
+                           Retrieve -> "\t"
+instance DisAssembly IOCmd where
+    disAssembly ioCmd = case ioCmd of
+                          OutChar  -> "  "
+                          OutInt   -> " \t"
+                          ReadChar -> "\t "
+                          ReadInt  -> "\t\t"
+instance DisAssembly CtrlCmd where
+    disAssembly ctrlCmd = case ctrlCmd of
+                            Label n    -> "  "  ++ disAssembly n
+                            Call  n    -> " \t" ++ disAssembly n
+                            Jump  n    -> " \n" ++ disAssembly n
+                            JumpZero n -> "\t " ++  disAssembly n
+                            JumpNeg n  -> "\t\t" ++ disAssembly n
+                            FuncEnd    -> "\t\n"
+                            ProgEnd    -> "\n\n"
+
+instance DisAssembly IMP where
+    disAssembly (Stack para)      = " "    ++ disAssembly para
+    disAssembly (Arithmetic para) = "\t"   ++ disAssembly para
+    disAssembly (Heap para)       = "\t\t" ++ disAssembly para
+    disAssembly (IO para)         = "\t\n" ++ disAssembly para
+    disAssembly (Control para)    = "\n"   ++ disAssembly para
+
 
 wsSpace = char ' '
 wsTab   = char '\t'
