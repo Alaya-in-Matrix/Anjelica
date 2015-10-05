@@ -5,7 +5,7 @@ import Control.Monad
 import Control.Applicative hiding((<|>), many)
 import System.Environment
 import Data.Maybe
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 
 data IMP     = Stack      StackOp
              | Arithmetic ArithOp
@@ -89,13 +89,34 @@ data VM = VM {
     jumptable :: M.Map Integer Int
 } deriving(Eq, Show)
 
+initVM :: [IMP] -> VM
+initVM instrs = let stack     = []
+                    heap      = M.empty
+                    pc        = 0
+                    jumptable = M.empty
+                 in VM stack heap instrs pc jumptable
+
+
+runWhiteSpace :: FilePath -> IO ()
+runWhiteSpace file = do
+    content <- readFile file
+    case parse (many impParser) "Whitespace" content of
+      Left  err -> print err
+      Right val -> do mapM_ (putStrLn.show) val
+                      eval $ initVM val
+                      putStr "\n"
+
+
 eval :: VM -> IO VM
 eval vm = let index   = pc vm
               codeMem = instructions vm
-              instr   = codeMem !! index
-           in case instr of
-                Control ProgEnd -> return vm
-                _               -> evalInstr vm instr >>= eval
+              size    = length codeMem
+           in if index >= size
+                 then return vm
+                 else let instr = codeMem !! index
+                       in case instr of
+                            Control ProgEnd -> return vm
+                            _               -> evalInstr vm instr >>= eval
 
 
 evalInstr :: VM -> IMP -> IO VM
@@ -135,37 +156,3 @@ evalInstr (VM s h i p j) (Control (JumpZero n)) = return $ VM s h i newPC j
   where newPC = if ((head s) == 0) then fromJust $ M.lookup n j
                                    else p+1
 
-
--- num   = "\t \t\t\n" -- (-3)
--- testInstructions = [
---     " "    ++ num 
---   , " "    ++ "\n " 
---   , " "    ++ "\t "  ++ num 
---   , " "    ++ "\n\t" 
---   , " "    ++ "\n\n" 
---   , " "    ++ "\t\n" ++ num
-
---   , "\t "  ++ "  "
---   , "\t "  ++ " \t"
---   , "\t "  ++ " \n"
---   , "\t "  ++ "\t "
---   , "\t "  ++ "\t\t"
-
---   , "\t\t" ++ "\t"
---   , "\t\t" ++ " "
-
---   , "\t\n" ++ " \t"
---   , "\t\n" ++ "  "
---   , "\t\n" ++ "\t\t"
---   , "\t\n" ++ "\t "
-
---   , "\n"   ++ "  "   ++ num
---   , "\n"   ++ " \t"  ++ num
---   , "\n"   ++ " \n"  ++ num
---   , "\n"   ++ "\t "  ++ num
---   , "\n"   ++ "\t\t" ++ num
---   , "\n"   ++ "\t\n"
---   , "\n"   ++ "\n\n"
---   ]
--- test :: IO ()
--- test = mapM_ (parseTest impParser) testInstructions
