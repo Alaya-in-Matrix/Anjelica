@@ -1,7 +1,10 @@
-module Language.Whitespace where
+module Language.WhiteSpace(
+    interpString
+    , interpFile
+  )where
 
 -- Author: lvwenlong_lambda@qq.com
--- Last Modified:2015年10月06日 星期二 15时37分22秒 二
+-- Last Modified:2015年10月06日 星期二 23时21分01秒 二
 
 import Text.ParserCombinators.Parsec
 import Control.Monad
@@ -12,7 +15,6 @@ import Numeric (showIntAtBase)
 import Data.Char(intToDigit)
 import qualified Data.Vector as V
 import qualified Data.Map.Strict as M hiding ((!))
-import Debug.Trace
 
 (!)  = (V.!)
 (!?) = (V.!?)
@@ -36,63 +38,13 @@ data IOCmd   = OutChar
              | OutInt 
              | ReadChar 
              | ReadInt deriving(Eq, Show)
-data CtrlCmd = Label Integer 
-             | Call Integer 
-             | Jump Integer 
-             | JumpZero Integer 
-             | JumpNeg Integer 
-             | FuncEnd 
-             | ProgEnd deriving(Eq, Show)
-
--- Perhaps I should test it through QuichCheck
--- Property: disAssembly (parseFunc str) == str
-class DisAssembly a where 
-    disAssembly :: a -> String
-instance DisAssembly Integer where
-    disAssembly n = let absn    = abs n
-                        sEncode = if signum n == 1 then ' ' else '\t' -- space for positive and tab for negative
-                        nEncode = map (\c->if c == '0' then ' ' else '\t') $ showIntAtBase 2 intToDigit absn ""
-                     in sEncode : nEncode ++ "\n"
-instance DisAssembly StackOp where
-    disAssembly stackOp = case stackOp of 
-                            (Push n)  -> ' ' : disAssembly n
-                            Duplicate -> "\n "
-                            Swap      -> "\n\t"
-                            Pop       -> "\n\n"
-instance DisAssembly ArithOp where
-    disAssembly arithOp = case arithOp of
-                            Add -> "  "
-                            Sub -> " \t"
-                            Mul -> " \n"
-                            Div -> "\t "
-                            Mod -> "\t\t"
-instance DisAssembly HeapOp where
-    disAssembly heapOp = case heapOp of
-                           Store    -> " "
-                           Retrieve -> "\t"
-instance DisAssembly IOCmd where
-    disAssembly ioCmd = case ioCmd of
-                          OutChar  -> "  "
-                          OutInt   -> " \t"
-                          ReadChar -> "\t "
-                          ReadInt  -> "\t\t"
-instance DisAssembly CtrlCmd where
-    disAssembly ctrlCmd = case ctrlCmd of
-                            Label n    -> "  "  ++ disAssembly n
-                            Call  n    -> " \t" ++ disAssembly n
-                            Jump  n    -> " \n" ++ disAssembly n
-                            JumpZero n -> "\t " ++  disAssembly n
-                            JumpNeg n  -> "\t\t" ++ disAssembly n
-                            FuncEnd    -> "\t\n"
-                            ProgEnd    -> "\n\n"
-
-instance DisAssembly IMP where
-    disAssembly (Stack para)      = " "    ++ disAssembly para
-    disAssembly (Arithmetic para) = "\t "  ++ disAssembly para
-    disAssembly (Heap para)       = "\t\t" ++ disAssembly para
-    disAssembly (IO para)         = "\t\n" ++ disAssembly para
-    disAssembly (Control para)    = "\n"   ++ disAssembly para
-
+data CtrlCmd = Label    Integer
+             | Call     Integer
+             | Jump     Integer
+             | JumpZero Integer
+             | JumpNeg  Integer
+             | FuncEnd
+             | ProgEnd  deriving(Eq, Show)
 
 wsSpace = char ' '
 wsTab   = char '\t'
@@ -166,7 +118,6 @@ genJumpTable imps = foldr mInsert M.empty (zip [(0::Int)..] imps)
                                   Control (Label n) -> M.insert n pc map
                                   _  -> map
 
-
 newStack f (VM s h i p j r) = VM (f s) h i p j r
 newHeap  f (VM s h i p j r) = VM s (f h) i p j r
 newInstr f (VM s h i p j r) = VM s h (f i) p j r
@@ -176,18 +127,6 @@ newRetS  f (VM s h i p j r) = VM s h i p j (f r)
 
 incPC :: VM -> IO VM
 incPC vm = return $ newPC (+1) vm
-
-
-runWhiteSpace :: FilePath -> IO ()
-runWhiteSpace file = do
-    content <- readFile file
-    case parse (many impParser) "Whitespace" content of
-      Left  err -> print err
-      Right val -> do mapM_ (putStrLn.show) val
-                      putStrLn "=============================="
-                      eval $ initVM val
-                      putStr "\n"
-
 
 eval :: VM -> IO VM
 eval vm = let index = pc vm
@@ -219,7 +158,9 @@ evalInstr vm (Heap Store) = incPC $ newHeap (M.insert addr val) vm
   where (addr:val:_) = stack vm
 evalInstr vm (Heap Retrieve) = incPC $ newStack retrieve vm
   where retrieve (addr:rest) = let val = M.lookup addr (heap vm)
-                                 in (fromJust val) : rest
+                                in case val of
+                                     Nothing  -> error $ "Can't retrieve addr " ++ (show addr) ++ " from heap"
+                                     Just val -> val : rest
 evalInstr vm (IO OutChar)  = do putChar $ toEnum $ fromEnum $ head $ stack vm
                                 incPC vm
 evalInstr vm (IO OutInt)   = do putStr $ show $ head $ stack vm
@@ -230,8 +171,11 @@ evalInstr vm (IO ReadInt)  = do int <- read <$> getLine
                                 incPC $ newStack (int:) vm
 evalInstr vm (Control (Label label)) = incPC vm -- Labels should already have been inserted into jumpTable
 evalInstr vm (Control (Call label))  = return $ (pcf . retSf) vm
-  where pcf   = newPC (const $ fromJust $ M.lookup label (jumptable vm))
-        retSf = newRetS (1+(pc vm):)
+  where pcf     = newPC (const $ fromJust $ M.lookup label (jumptable vm))
+        retSf   = newRetS (1+(pc vm):)
+        labelPC = case M.lookup label (jumptable vm) of
+                    Nothing -> error $ "Can't find corresponding PC in jumptable for label " ++ show label
+                    Just p  -> p
 evalInstr vm (Control (Jump label))  = return $ newPC pcf vm
   where pcf = let newPC = M.lookup label (jumptable vm)
                in case newPC of
@@ -257,6 +201,17 @@ evalInstr vm (Control FuncEnd) = return $ (pcf . retSf) vm
   where retSf = newRetS tail
         pcf   = newPC (const $ head $ retStack vm) 
 evalInstr vm (Control ProgEnd) = undefined
+
+interpString :: String -> IO ()
+interpString wsCode = do let content = filter (`elem` " \t\n") wsCode
+                         case parse (many impParser) "Whitespace" content of
+                           Left  err   -> print err
+                           Right exprs -> do mapM_ (putStrLn.show) exprs
+                                             putStrLn "==============================="
+                                             () <$ (eval $ initVM exprs)
+interpFile :: FilePath -> IO ()
+interpFile file = readFile file >>= interpString
+
 
 fibimp :: [IMP]
 fibimp = [
@@ -321,12 +276,51 @@ fac = [
             facEndLabel          = 2
             subOneLabel          = 3
 
-vm = initVM fac
+-- Perhaps I should test it through QuichCheck
+-- Property: disAssembly (parseFunc str) == str
+class DisAssembly a where 
+    disAssembly :: a -> String
+instance DisAssembly Integer where
+    disAssembly n = let absn    = abs n
+                        sEncode = if signum n == 1 then ' ' else '\t' -- space for positive and tab for negative
+                        nEncode = map (\c->if c == '0' then ' ' else '\t') $ showIntAtBase 2 intToDigit absn ""
+                     in sEncode : nEncode ++ "\n"
+instance DisAssembly StackOp where
+    disAssembly stackOp = case stackOp of 
+                            (Push n)  -> ' ' : disAssembly n
+                            Duplicate -> "\n "
+                            Swap      -> "\n\t"
+                            Pop       -> "\n\n"
+instance DisAssembly ArithOp where
+    disAssembly arithOp = case arithOp of
+                            Add -> "  "
+                            Sub -> " \t"
+                            Mul -> " \n"
+                            Div -> "\t "
+                            Mod -> "\t\t"
+instance DisAssembly HeapOp where
+    disAssembly heapOp = case heapOp of
+                           Store    -> " "
+                           Retrieve -> "\t"
+instance DisAssembly IOCmd where
+    disAssembly ioCmd = case ioCmd of
+                          OutChar  -> "  "
+                          OutInt   -> " \t"
+                          ReadChar -> "\t "
+                          ReadInt  -> "\t\t"
+instance DisAssembly CtrlCmd where
+    disAssembly ctrlCmd = case ctrlCmd of
+                            Label n    -> "  "  ++ disAssembly n
+                            Call  n    -> " \t" ++ disAssembly n
+                            Jump  n    -> " \n" ++ disAssembly n
+                            JumpZero n -> "\t " ++  disAssembly n
+                            JumpNeg n  -> "\t\t" ++ disAssembly n
+                            FuncEnd    -> "\t\n"
+                            ProgEnd    -> "\n\n"
 
-parseI :: IMP -> Either ParseError IMP
-parseI imp = let code = disAssembly imp
-              in  parse impParser "" code
-
-test :: IO ()
-test = let parsed = zip fac $ map parseI fac
-        in mapM_ (putStrLn.show) parsed
+instance DisAssembly IMP where
+    disAssembly (Stack para)      = " "    ++ disAssembly para
+    disAssembly (Arithmetic para) = "\t "  ++ disAssembly para
+    disAssembly (Heap para)       = "\t\t" ++ disAssembly para
+    disAssembly (IO para)         = "\t\n" ++ disAssembly para
+    disAssembly (Control para)    = "\n"   ++ disAssembly para

@@ -17,7 +17,8 @@ cabal-version:       >=1.10
 
 executable anjelica
   main-is:             Main.hs
-  other-modules:       Language.Whitespace
+  other-modules:       Language.WhiteSpace
+                     , Language.BrainFuck
   -- other-extensions:    
   build-depends:       base >=4.8 && <4.9
                      , parsec == 3.1.9
