@@ -1,7 +1,7 @@
 module Language.Whitespace where
 
 -- Author: lvwenlong_lambda@qq.com
--- Last Modified:2015年10月06日 星期二 00时37分45秒 二
+-- Last Modified:2015年10月06日 星期二 09时35分29秒 二
 
 import Text.ParserCombinators.Parsec
 import Control.Monad
@@ -146,7 +146,7 @@ data VM = VM {
     instructions :: V.Vector IMP , -- This should be an array(vector) instead of a list
     pc :: Int , 
     jumptable :: M.Map Integer Int,
-    retStack :: [Integer]
+    retStack :: [Int]
 } deriving(Eq, Show)
 
 initVM :: V.Vector IMP -> VM
@@ -210,29 +210,41 @@ evalInstr vm (Heap Store) = incPC $ newHeap (M.insert addr val) vm
 evalInstr vm (Heap Retrieve) = incPC $ newStack retrieve vm
   where retrieve (addr:rest) = let val = M.lookup addr (heap vm)
                                  in (fromJust val) : rest
-
--- evalInstr :: VM -> IMP -> IO VM
--- evalInstr (VM (val:addr:rest) h i p j) (Heap Store) = return $ VM rest newHeap i (p+1) j
---   where newHeap = M.insert addr val h 
--- evalInstr (VM (addr:rest) h i p j) (Heap Retrieve)  = return $ VM (val:rest) h i (p+1) j
---   where val = fromJust $ M.lookup addr h
--- evalInstr vm@(VM s h i p j) (IO OutChar)  = (VM s h i (p+1) j)<$ (putChar . toEnum . fromEnum . head) s
--- evalInstr vm@(VM s h i p j) (IO OutInt)   = (VM s h i (p+1) j)<$  (putStr  . show   . fromEnum . head) s
--- evalInstr vm@(VM s h i p j) (IO ReadChar) = do int <- (toInteger.fromEnum) <$> getChar
---                                                return $ VM (int:s) h i (p+1) j
--- evalInstr vm@(VM s h i p j) (IO ReadInt)  = do int <- read <$> getLine
---                                                return $ VM (int:s) h i (p+1) j
--- evalInstr (VM s h i p j) (Control (Label n)) = return $ VM s h i (p+1) newJump
---   where newJump = M.insert n (p+1) j
--- evalInstr (VM s h i p j) (Control (Call label)) = undefined
--- evalInstr (VM s h i p j) (Control FuncEnd)      = undefined
--- evalInstr (VM s h i p j) (Control ProgEnd)      = undefined
--- evalInstr (VM s h i p j) (Control (Jump n)) = return $ VM s h i newPC j
---   where newPC = fromJust $ M.lookup n j
--- evalInstr (VM s h i p j) (Control (JumpNeg n)) = return $ VM s h i newPC j
---   where newPC = if ((head s) < 0) then fromJust $ M.lookup n j
---                                   else p+1
--- evalInstr (VM s h i p j) (Control (JumpZero n)) = return $ VM s h i newPC j
---   where newPC = if ((head s) == 0) then fromJust $ M.lookup n j
---                                    else p+1
+evalInstr vm (IO OutChar)  = do putChar $ toEnum $ fromEnum $ head $ stack vm
+                                incPC vm
+evalInstr vm (IO OutInt)   = do putStr $ show $ head $ stack vm
+                                incPC vm
+evalInstr vm (IO ReadChar) = do int <- (toInteger . fromEnum) <$> getChar
+                                incPC $ newStack (int:) vm
+evalInstr vm (IO ReadInt)  = do int <- read <$> getLine
+                                incPC $ newStack (int:) vm
+evalInstr vm (Control (Label label)) = undefined
+evalInstr vm (Control (Call label))  = return $ (pcf . retSf) vm
+  where pcf   = newPC (const $ fromIntegral label)
+        retSf = newRetS ((pc vm):)
+evalInstr vm (Control (Jump label))  = return $ newPC pcf vm
+  where pcf = let newPC = M.lookup label (jumptable vm)
+               in case newPC of
+                    Nothing -> error $ "can not find label for Jump " ++ show label
+                    Just v  -> const v
+evalInstr vm (Control (JumpNeg label)) = return $ newPC pcf vm
+  where pcf = let top = head $ stack vm
+               in if top >= 0 
+                     then (+1)
+                     else let newPC = M.lookup label (jumptable vm)
+                           in case newPC of
+                                Nothing -> error $ "can not find label for JumpNeg " ++ show label 
+                                Just v  -> const v
+evalInstr vm (Control (JumpZero label)) = return $ newPC pcf vm
+  where pcf = let top = head $ stack vm
+               in if top /= 0 
+                     then (+1)
+                     else let newPC = M.lookup label (jumptable vm)
+                           in case newPC of
+                                Nothing -> error $ "can not find label for JumpNeg " ++ show label 
+                                Just v  -> const v
+evalInstr vm (Control FuncEnd) = return $ (pcf . retSf) vm
+  where retSf = newRetS tail
+        pcf   = newPC (const $ head $ retStack vm) 
+evalInstr vm (Control ProgEnd) = undefined
 
