@@ -1,7 +1,7 @@
 module Language.Whitespace where
 
 -- Author: lvwenlong_lambda@qq.com
--- Last Modified:2015年10月06日 星期二 12时18分23秒 二
+-- Last Modified:2015年10月06日 星期二 15时37分22秒 二
 
 import Text.ParserCombinators.Parsec
 import Control.Monad
@@ -12,6 +12,7 @@ import Numeric (showIntAtBase)
 import Data.Char(intToDigit)
 import qualified Data.Vector as V
 import qualified Data.Map.Strict as M hiding ((!))
+import Debug.Trace
 
 (!)  = (V.!)
 (!?) = (V.!?)
@@ -87,7 +88,7 @@ instance DisAssembly CtrlCmd where
 
 instance DisAssembly IMP where
     disAssembly (Stack para)      = " "    ++ disAssembly para
-    disAssembly (Arithmetic para) = "\t"   ++ disAssembly para
+    disAssembly (Arithmetic para) = "\t "  ++ disAssembly para
     disAssembly (Heap para)       = "\t\t" ++ disAssembly para
     disAssembly (IO para)         = "\t\n" ++ disAssembly para
     disAssembly (Control para)    = "\n"   ++ disAssembly para
@@ -138,7 +139,7 @@ ctrlCmdParser = wsSpace *> (wsSpace *> (Label <$> numParser) <|>
             <|> wsTab   *> (wsSpace *> (JumpZero <$> numParser) <|>
                             wsTab   *> (JumpNeg  <$> numParser) <|>
                             FuncEnd <$ wsLf)
-            <|> FuncEnd <$ (wsLf *> wsLf)
+            <|> ProgEnd <$ (wsLf *> wsLf)
 
 data VM = VM {
     stack :: [Integer] , 
@@ -199,7 +200,7 @@ eval vm = let index = pc vm
 
 evalInstr :: VM -> IMP -> IO VM
 evalInstr vm (Stack (Push num)) = incPC $ newStack (num:) vm
-evalInstr vm (Stack Duplicate)  = undefined -- not supported yet
+evalInstr vm (Stack Duplicate)  = incPC $ newStack ((head $ stack vm):) vm
 evalInstr vm (Stack Pop)        = incPC $ newStack tail vm
 evalInstr vm (Stack Swap)       = incPC $ newStack swapTop vm
   where swapTop []  = error "empty list"
@@ -229,8 +230,8 @@ evalInstr vm (IO ReadInt)  = do int <- read <$> getLine
                                 incPC $ newStack (int:) vm
 evalInstr vm (Control (Label label)) = incPC vm -- Labels should already have been inserted into jumpTable
 evalInstr vm (Control (Call label))  = return $ (pcf . retSf) vm
-  where pcf   = newPC (const $ fromIntegral label)
-        retSf = newRetS ((pc vm):)
+  where pcf   = newPC (const $ fromJust $ M.lookup label (jumptable vm))
+        retSf = newRetS (1+(pc vm):)
 evalInstr vm (Control (Jump label))  = return $ newPC pcf vm
   where pcf = let newPC = M.lookup label (jumptable vm)
                in case newPC of
@@ -257,3 +258,75 @@ evalInstr vm (Control FuncEnd) = return $ (pcf . retSf) vm
         pcf   = newPC (const $ head $ retStack vm) 
 evalInstr vm (Control ProgEnd) = undefined
 
+fibimp :: [IMP]
+fibimp = [
+    IO ReadInt
+    , Stack Duplicate
+    , Control (Call fib)
+    , IO OutInt
+    , Stack (Push 10) 
+    , IO OutChar
+    , Control ProgEnd
+
+    , Control (Label fib) -- function to calculate fib
+        , Stack (Push (-2))   -- test n < 2
+        , Arithmetic Add
+        , Control (JumpNeg fibRecursionOut)
+        , Stack Duplicate
+        , Control (Call fib)  -- fib (n-2)
+        , Stack Swap
+        , Stack (Push 1)
+        , Arithmetic Add     -- n-2+1
+        , Control (Call fib)  -- fib(n-1)
+        , Arithmetic Add
+        , Control (Jump fibEnd)
+    , Control (Label fibRecursionOut)
+        , Stack Pop
+        , Stack (Push 1)
+    , Control (Label fibEnd)
+    , Control FuncEnd
+    ] where fib             = 0
+            fibRecursionOut = 1
+            fibEnd          = 2
+
+fac :: [IMP]
+fac = [
+    IO ReadInt
+    , Stack Duplicate
+    , Control (Call facLabel)
+    , IO OutInt
+    , Stack (Push 10)
+    , IO OutChar
+    , Control ProgEnd
+
+    , Control (Label facLabel)          -- function to calculate fac number
+        , Control (JumpZero facOutRecursionLabel)
+        , Stack Duplicate
+        , Control (Call subOneLabel)
+        , Control (Call facLabel)           -- call fac(n-1)
+        , Arithmetic Mul
+        , Control (Jump facEndLabel)
+    , Control (Label facOutRecursionLabel)
+        , Stack Pop
+        , Stack (Push 1)
+    , Control (Label facEndLabel)
+    , Control FuncEnd
+
+    , Control (Label subOneLabel)     -- function to subtract one from stack top
+        , Stack (Push (-1))
+        , Arithmetic Add
+    , Control FuncEnd
+    ] where facLabel             = 0
+            facOutRecursionLabel = 1
+            facEndLabel          = 2
+            subOneLabel          = 3
+
+vm = initVM fac
+
+parseI :: IMP -> Either ParseError IMP
+parseI imp = let code = disAssembly imp
+              in  parse impParser "" code
+
+test :: IO ()
+test = let parsed = zip fac $ map parseI fac
+        in mapM_ (putStrLn.show) parsed
