@@ -12,8 +12,15 @@ maintainer:          lvwenlong_lambda@qq.com
 -- copyright:           
 category:            Language
 build-type:          Simple
--- extra-source-files:  
+extra-source-files:  test-source/fac.ws
+                   , test-source/fib.ws
+                   , test-source/add.bf
 cabal-version:       >=1.10
+
+source-repository head
+    type:     git
+    location: git@github.com:Alaya-in-Matrix/Anjelica.git 
+
 
 executable anjelica
   main-is:             Main.hs
