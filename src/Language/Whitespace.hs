@@ -1,7 +1,7 @@
 module Language.Whitespace where
 
 -- Author: lvwenlong_lambda@qq.com
--- Last Modified:2015年10月06日 星期二 09时35分29秒 二
+-- Last Modified:2015年10月06日 星期二 12时18分23秒 二
 
 import Text.ParserCombinators.Parsec
 import Control.Monad
@@ -149,13 +149,22 @@ data VM = VM {
     retStack :: [Int]
 } deriving(Eq, Show)
 
-initVM :: V.Vector IMP -> VM
+initVM :: [IMP] -> VM
 initVM instrs = let stack     = []
                     heap      = M.empty
                     pc        = 0
-                    jumptable = M.empty
+                    jumptable = genJumpTable instrs
                     retStack  = []
-                 in VM stack heap instrs pc jumptable retStack
+                 in VM stack heap (V.fromList instrs) pc jumptable retStack
+
+
+genJumpTable :: [IMP] -> M.Map Integer Int
+genJumpTable imps = foldr mInsert M.empty (zip [(0::Int)..] imps)
+  where mInsert :: (Int,IMP) -> M.Map Integer Int -> M.Map Integer Int
+        mInsert (pc, imp) map = case imp of
+                                  Control (Label n) -> M.insert n pc map
+                                  _  -> map
+
 
 newStack f (VM s h i p j r) = VM (f s) h i p j r
 newHeap  f (VM s h i p j r) = VM s (f h) i p j r
@@ -175,7 +184,7 @@ runWhiteSpace file = do
       Left  err -> print err
       Right val -> do mapM_ (putStrLn.show) val
                       putStrLn "=============================="
-                      eval $ initVM (V.fromList val)
+                      eval $ initVM val
                       putStr "\n"
 
 
@@ -218,7 +227,7 @@ evalInstr vm (IO ReadChar) = do int <- (toInteger . fromEnum) <$> getChar
                                 incPC $ newStack (int:) vm
 evalInstr vm (IO ReadInt)  = do int <- read <$> getLine
                                 incPC $ newStack (int:) vm
-evalInstr vm (Control (Label label)) = undefined
+evalInstr vm (Control (Label label)) = incPC vm -- Labels should already have been inserted into jumpTable
 evalInstr vm (Control (Call label))  = return $ (pcf . retSf) vm
   where pcf   = newPC (const $ fromIntegral label)
         retSf = newRetS ((pc vm):)
