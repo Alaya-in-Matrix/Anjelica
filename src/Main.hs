@@ -1,10 +1,15 @@
 module Main where
-import Control.Applicative 
-import Control.Monad
 import System.Environment
 import qualified Language.WhiteSpace as W
 import qualified Language.BrainFuck as B
-
-
+ 
 main :: IO ()
-main = undefined
+main = do   
+    (lang:filePath:_) <- getArgs
+    let interpFile | lang == "-ws" || lang == "--whitespace" = W.interpFile
+                   | lang == "-bf" || lang == "--brainfuck"  = B.interpFile
+                   | otherwise = error $ "Invalid language"
+      in interpFile filePath
+    
+
+
