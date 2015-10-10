@@ -4,7 +4,7 @@ module Language.ElementaryArithmetic(
     , interpString
     )where
 -- Author: lvwenlong_lambda@qq.com
--- Last Modified:CST 2015-10-10 14:50:28 星期六
+-- Last Modified:CST 2015-10-10 15:11:51 星期六
 import Text.ParserCombinators.Parsec
 import Control.Applicative hiding((<|>))
 import Data.String
@@ -42,21 +42,21 @@ instance Show Expr3 where
 
 exprParser :: Parser Expr
 exprParser = chainl1 (E2 <$> expr2Parser) exprOp 
-    where exprOp = do op <- Add <$ char '+' <|> Sub <$ char '-'
+    where exprOp = do op <- Add <$ char '+' <|> Sub <$ char '-' <?> "Addition(+) or subtraction(-)"
                       return $ \e1 (E2 e2) -> op e1 e2
 
 expr2Parser :: Parser Expr2
 expr2Parser = chainl1 (E3 <$> expr3Parser) expr2Op
-    where expr2Op = do op <- (Mul <$ char '*' <|> Div <$ char '/')
+    where expr2Op = do op <- Mul <$ char '*' <|> Div <$ char '/' <?> "Multiplication(*) or division(/)"
                        return $ \e1 (E3 e2) -> op e1 e2
 expr3Parser :: Parser Expr3
-expr3Parser = quoteParser <|> literalParser <?> "expr3"
+expr3Parser = quoteParser <|> literalParser <?> "Quoted expresion or number literal"
   where quoteParser   = Quote  <$> between (char '(') (char ')') exprParser
         literalParser = NumLit <$> read <$> many1 digit
 
 interpString :: String -> IO ()
 interpString  exprStr = let expr = filter (/= ' ') exprStr
-                         in case parse exprParser "Elementary Arithmetic" expr of
+                         in case parse (exprParser <* eof) "Elementary Arithmetic" expr of
                               Left err     -> error $ show err
                               Right parsed -> print parsed 
                                               >> (print $ eval parsed)
