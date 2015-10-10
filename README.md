@@ -1,14 +1,15 @@
 # README
 
 * Author: lvwenlong_lambda@qq.com
-* Last Modified:2015年10月05日 星期一 22时23分49秒 一
+* Last Modified:CST 2015-10-10 14:57:28 星期六
 
 ## About this project
 
 Parsers for some interesting programming language, writtin in Haskell, using `Parsec`
 
-* brainfuck
+* BrainFuck
 * Whitespace
+* Elementary Arithmetic
 
 ## About Brainfuck
 
@@ -25,3 +26,9 @@ Parsers for some interesting programming language, writtin in Haskell, using `Pa
 
 * [Whitespace Wiki](https://en.wikipedia.org/wiki/Whitespace_(programming_language))
 * [Whitespace Tutorial](http://compsoc.dur.ac.uk/whitespace/tutorial.html)
+
+
+## About Elementary Arithmetic
+* Support `+`, `-`, `*`, `/`
+* Support parentheses `(` and `)`
+* Interpreter will convert string expression to lisp-style s-expression and evaluate it
