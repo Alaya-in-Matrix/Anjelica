@@ -12,21 +12,21 @@ import System.Environment
 -- both preList and currentList are supposed to be infinite list
 -- so I won't consider the situation of empty list
 data MoveList = MoveList {
-    preList :: [Char],
-    currentList :: [Char]
+    preList :: [Int],
+    currentList :: [Int]
 } deriving(Eq)
 
 
 next      (MoveList pre    (c:cs))   = MoveList (c:pre) cs
 prev      (MoveList (p:ps) curr)     = MoveList ps (p:curr)
 headEle   (MoveList prev   curr)     = head curr
-newHead   x (MoveList prev   (c:cs)) = MoveList prev (x:cs)
-headApply f (MoveList pre (c:cs))    = MoveList pre ((f c) : cs)
+newHead   (MoveList prev   (c:cs)) x = MoveList prev (x:cs)
+headApply f (MoveList pre (c:cs))    = MoveList pre (f c : cs)
 addOne = headApply succ
 subOne = headApply pred
 
 instance Show MoveList where 
-    show (MoveList _ (c:cs)) = "MoveList [...] [" ++ [c] ++ ", ...]"
+    show (MoveList _ (c:cs)) = "MoveList [...] [" ++ [toEnum c] ++ ", ...]"
 
 data BrainFuck = RightMove 
                | LeftMove
@@ -54,8 +54,8 @@ eval env RightMove    = return $ next   env
 eval env LeftMove     = return $ prev   env
 eval env Add          = return $ addOne env
 eval env Sub          = return $ subOne env
-eval env Output       = putChar (headEle env) >> return env
-eval env Input        = getChar >>= return . (flip newHead) env
+eval env Output       = putChar (toEnum $ headEle env) >> return env
+eval env Input        = newHead env <$> (fromEnum <$> getChar)
 eval env (Loop exprs) = case fromEnum (headEle env) of
                           0 -> return env
                           _ -> foldM eval env exprs >>= flip eval (Loop exprs)
@@ -67,7 +67,7 @@ interpString bfCode = do
     putStrLn content
     putStrLn "======================================"
     let parsed = parse parseBrainFuck "BrainFuck" content
-        env    = MoveList init init where init = map toEnum (repeat 0)
+        env    = MoveList init init where init = repeat 0
     case parsed of
          Left err    -> print err
          Right exprs -> do putStrLn "Result: "
