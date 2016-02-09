@@ -4,17 +4,17 @@ module Language.WhiteSpace(
   )where
 
 -- Author: lvwenlong_lambda@qq.com
--- Last Modified:2015年10月06日 星期二 23时21分01秒 二
+-- Last Modified:2016年02月09日 星期二 19时10分01秒 二
 
-import Text.ParserCombinators.Parsec
-import Control.Monad
-import Control.Applicative hiding((<|>), many)
-import System.Environment
-import Data.Maybe
-import Numeric (showIntAtBase)
-import Data.Char(intToDigit)
-import qualified Data.Vector as V
-import qualified Data.Map.Strict as M hiding ((!))
+import           Control.Applicative           hiding (many, (<|>))
+import           Control.Monad
+import           Data.Char                     (intToDigit)
+import qualified Data.Map.Strict               as M hiding ((!))
+import           Data.Maybe
+import qualified Data.Vector                   as V
+import           Numeric                       (showIntAtBase)
+import           System.Environment
+import           Text.ParserCombinators.Parsec
 
 (!)  = (V.!)
 (!?) = (V.!?)
@@ -24,19 +24,19 @@ data IMP     = Stack      StackOp
              | Heap       HeapOp
              | Control    CtrlCmd
              | IO         IOCmd deriving(Show, Eq)
-data StackOp = Push Integer 
-             | Duplicate 
-             | Swap 
+data StackOp = Push Integer
+             | Duplicate
+             | Swap
              | Pop deriving(Eq, Show)
-data ArithOp = Add 
-             | Sub 
-             | Mul 
-             | Div 
+data ArithOp = Add
+             | Sub
+             | Mul
+             | Div
              | Mod deriving(Eq, Show)
 data HeapOp  = Store | Retrieve deriving(Eq, Show)
-data IOCmd   = OutChar 
-             | OutInt 
-             | ReadChar 
+data IOCmd   = OutChar
+             | OutInt
+             | ReadChar
              | ReadInt deriving(Eq, Show)
 data CtrlCmd = Label    Integer
              | Call     Integer
@@ -53,7 +53,7 @@ wsLf    = char '\n'
 impParser :: Parser IMP
 impParser = wsLf *> (Control  <$> ctrlCmdParser)
         <|> wsSpace *> (Stack <$> stackOpParser)
-        <|> wsTab   *> (wsSpace *> (Arithmetic <$> arithOpParser) <|> 
+        <|> wsTab   *> (wsSpace *> (Arithmetic <$> arithOpParser) <|>
                         wsTab   *> (Heap <$> heapOpParser)        <|>
                         wsLf    *> (IO <$> ioCmdParser))
 
@@ -64,13 +64,13 @@ numParser = ((*) <$> signParser <*> intParser) <* wsLf
         intParser     = bitsToInteger <$> (many bitParser)
         bitsToInteger = foldl ((+) . (*2)) 0
 
-stackOpParser :: Parser StackOp 
+stackOpParser :: Parser StackOp
 stackOpParser = do
     firstChar <- oneOf " \t\n"
     case firstChar of
       ' '  -> Push <$> numParser
-      '\n' -> Duplicate <$ wsSpace 
-              <|> Swap  <$ wsTab   
+      '\n' -> Duplicate <$ wsSpace
+              <|> Swap  <$ wsTab
               <|> Pop   <$ wsLf
 
 arithOpParser :: Parser ArithOp
@@ -94,12 +94,12 @@ ctrlCmdParser = wsSpace *> (wsSpace *> (Label <$> numParser) <|>
             <|> ProgEnd <$ (wsLf *> wsLf)
 
 data VM = VM {
-    stack :: [Integer] , 
-    heap :: M.Map Integer Integer,
+    stack        :: [Integer] ,
+    heap         :: M.Map Integer Integer,
     instructions :: V.Vector IMP , -- This should be an array(vector) instead of a list
-    pc :: Int , 
-    jumptable :: M.Map Integer Int,
-    retStack :: [Int]
+    pc           :: Int ,
+    jumptable    :: M.Map Integer Int,
+    retStack     :: [Int]
 } deriving(Eq, Show)
 
 initVM :: [IMP] -> VM
@@ -132,7 +132,7 @@ eval :: VM -> IO VM
 eval vm = let index = pc vm
               codeMem = instructions vm
               instr = codeMem !? index
-           in case instr of 
+           in case instr of
                 Nothing                 -> return vm
                 Just (Control ProgEnd)  -> return vm
                 Just ins                -> evalInstr vm ins >>= eval
@@ -183,23 +183,23 @@ evalInstr vm (Control (Jump label))  = return $ newPC pcf vm
                     Just v  -> const v
 evalInstr vm (Control (JumpNeg label)) = return $ newPC pcf vm
   where pcf = let top = head $ stack vm
-               in if top >= 0 
+               in if top >= 0
                      then (+1)
                      else let newPC = M.lookup label (jumptable vm)
                            in case newPC of
-                                Nothing -> error $ "can not find label for JumpNeg " ++ show label 
+                                Nothing -> error $ "can not find label for JumpNeg " ++ show label
                                 Just v  -> const v
 evalInstr vm (Control (JumpZero label)) = return $ newPC pcf vm
   where pcf = let top = head $ stack vm
-               in if top /= 0 
+               in if top /= 0
                      then (+1)
                      else let newPC = M.lookup label (jumptable vm)
                            in case newPC of
-                                Nothing -> error $ "can not find label for JumpNeg " ++ show label 
+                                Nothing -> error $ "can not find label for JumpNeg " ++ show label
                                 Just v  -> const v
 evalInstr vm (Control FuncEnd) = return $ (pcf . retSf) vm
   where retSf = newRetS tail
-        pcf   = newPC (const $ head $ retStack vm) 
+        pcf   = newPC (const $ head $ retStack vm)
 evalInstr vm (Control ProgEnd) = undefined
 
 interpString :: String -> IO ()
@@ -219,7 +219,7 @@ fibimp = [
     , Stack Duplicate
     , Control (Call fib)
     , IO OutInt
-    , Stack (Push 10) 
+    , Stack (Push 10)
     , IO OutChar
     , Control ProgEnd
 
@@ -278,7 +278,7 @@ fac = [
 
 -- Perhaps I should test it through QuichCheck
 -- Property: disAssembly (parseFunc str) == str
-class DisAssembly a where 
+class DisAssembly a where
     disAssembly :: a -> String
 instance DisAssembly Integer where
     disAssembly n = let absn    = abs n
@@ -286,7 +286,7 @@ instance DisAssembly Integer where
                         nEncode = map (\c->if c == '0' then ' ' else '\t') $ showIntAtBase 2 intToDigit absn ""
                      in sEncode : nEncode ++ "\n"
 instance DisAssembly StackOp where
-    disAssembly stackOp = case stackOp of 
+    disAssembly stackOp = case stackOp of
                             (Push n)  -> ' ' : disAssembly n
                             Duplicate -> "\n "
                             Swap      -> "\n\t"

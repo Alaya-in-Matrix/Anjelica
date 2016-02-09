@@ -3,16 +3,16 @@ module Language.BrainFuck(
     interpFile,
     )where
 
-import Text.ParserCombinators.Parsec
-import Control.Applicative hiding((<|>), many)
-import Control.Monad
-import System.Environment
+import           Control.Applicative           hiding (many, (<|>))
+import           Control.Monad
+import           System.Environment
+import           Text.ParserCombinators.Parsec
 
 
 -- both preList and currentList are supposed to be infinite list
 -- so I won't consider the situation of empty list
 data MoveList = MoveList {
-    preList :: [Int],
+    preList     :: [Int],
     currentList :: [Int]
 } deriving(Eq)
 
@@ -25,10 +25,10 @@ headApply f (MoveList pre (c:cs))    = MoveList pre ((f c) : cs)
 add n = headApply (+n)
 sub n = headApply (subtract n)
 
-instance Show MoveList where 
+instance Show MoveList where
     show (MoveList _ (c:cs)) = "MoveList [...] [" ++ [toEnum c] ++ ", ...]"
 
-data BrainFuck = RightMove 
+data BrainFuck = RightMove
                | LeftMove
                | Add Int
                | Sub Int
