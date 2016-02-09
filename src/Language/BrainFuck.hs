@@ -20,18 +20,18 @@ data MoveList = MoveList {
 next      (MoveList pre    (c:cs))   = MoveList (c:pre) cs
 prev      (MoveList (p:ps) curr)     = MoveList ps (p:curr)
 headEle   (MoveList prev   curr)     = head curr
-newHead   (MoveList prev   (c:cs)) x = MoveList prev (x:cs)
-headApply f (MoveList pre (c:cs))    = MoveList pre (f c : cs)
-addOne = headApply succ
-subOne = headApply pred
+newHead   x (MoveList prev   (c:cs)) = MoveList prev (x:cs)
+headApply f (MoveList pre (c:cs))    = MoveList pre ((f c) : cs)
+add n = headApply (+n)
+sub n = headApply (subtract n)
 
 instance Show MoveList where 
     show (MoveList _ (c:cs)) = "MoveList [...] [" ++ [toEnum c] ++ ", ...]"
 
 data BrainFuck = RightMove 
                | LeftMove
-               | Add
-               | Sub
+               | Add Int
+               | Sub Int
                | Output
                | Input
                | Loop [BrainFuck]
@@ -41,8 +41,8 @@ parseBrainFuck :: Parser [BrainFuck]
 parseBrainFuck = many parseBrainFuckOp
   where parseBrainFuckOp = RightMove <$ char '>'
                        <|> LeftMove  <$ char '<'
-                       <|> Add       <$ char '+'
-                       <|> Sub       <$ char '-'
+                       <|> Add <$> (length <$> (many1 $ char '+'))
+                       <|> Sub <$> (length <$> (many1 $ char '-'))
                        <|> Output    <$ char '.'
                        <|> Input     <$ char ','
                        <|> Loop <$> between (char '[') (char ']') parseBrainFuck
@@ -52,10 +52,10 @@ parseBrainFuck = many parseBrainFuckOp
 eval :: MoveList  -> BrainFuck -> IO MoveList
 eval env RightMove    = return $ next   env
 eval env LeftMove     = return $ prev   env
-eval env Add          = return $ addOne env
-eval env Sub          = return $ subOne env
+eval env (Add n)      = return $ add n  env
+eval env (Sub n)      = return $ sub n  env
 eval env Output       = putChar (toEnum $ headEle env) >> return env
-eval env Input        = newHead env <$> (fromEnum <$> getChar)
+eval env Input        = (fromEnum <$> getChar) >>= return . (flip newHead) env
 eval env (Loop exprs) = case fromEnum (headEle env) of
                           0 -> return env
                           _ -> foldM eval env exprs >>= flip eval (Loop exprs)
